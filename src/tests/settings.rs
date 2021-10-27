@@ -1,5 +1,5 @@
 use crate::settings::{is_palindrome, Settings};
-use kubewarden_policy_sdk::settings::Validatable;
+use kubewarden::settings::Validatable;
 use std::collections::HashSet;
 
 #[test]

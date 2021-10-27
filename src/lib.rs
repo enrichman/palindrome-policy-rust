@@ -4,16 +4,12 @@ mod tests;
 mod settings;
 mod validate;
 
-extern crate wapc_guest as guest;
-use guest::prelude::*;
-
-extern crate kubewarden_policy_sdk as kubewarden;
 use kubewarden::{logging, protocol_version_guest, validate_settings};
-
 use lazy_static::lazy_static;
 use settings::Settings;
 use slog::{o, Logger};
 use validate::validate;
+use wapc::prelude::*;
 
 lazy_static! {
     static ref LOG_DRAIN: Logger = Logger::root(

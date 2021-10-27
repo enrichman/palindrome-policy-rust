@@ -1,14 +1,11 @@
-extern crate kubewarden_policy_sdk as kubewarden;
-use kubewarden::request::ValidationRequest;
-
-extern crate wapc_guest as guest;
-use guest::prelude::*;
-
 use crate::settings::is_palindrome;
 use crate::settings::Settings;
 use crate::LOG_DRAIN;
+
 use k8s_openapi::api::core::v1 as apicore;
+use kubewarden::request::ValidationRequest;
 use slog::{info, warn};
+use wapc::prelude::*;
 
 pub fn validate(payload: &[u8]) -> CallResult {
     let validation_request: ValidationRequest<Settings> = ValidationRequest::new(payload)?;

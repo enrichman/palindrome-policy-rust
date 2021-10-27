@@ -1,6 +1,6 @@
 use crate::settings::Settings;
 use crate::validate::validate;
-use kubewarden_policy_sdk::test::Testcase;
+use kubewarden::test::Testcase;
 
 #[test]
 fn accept_pod_with_no_palindromes() {
