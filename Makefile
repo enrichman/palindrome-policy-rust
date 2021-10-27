@@ -14,6 +14,10 @@ lint:
 test: fmt lint
 	cargo test
 
+.PHONY: e2e-tests
+e2e-tests:
+	bats e2e.bats
+
 .PHONY: clean
 clean:
 	cargo clean

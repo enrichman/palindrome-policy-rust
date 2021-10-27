@@ -1,19 +1,17 @@
 rules:
-- apiGroups: [""]
-  apiVersions: ["v1"]
-  resources: ["pods"]
-  operations: ["CREATE"]
-mutating: false
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+    operations: ["CREATE", "UPDATE"]
+mutating: true
 contextAware: false
 executionMode: kubewarden-wapc
 annotations:
-  io.kubewarden.policy.title: palindrome-policy-rust
-  io.kubewarden.policy.description: Short description
-  io.kubewarden.policy.author: Enrico Candino <enrico.candino@gmail.com>
-  io.kubewarden.policy.url: https://github.com/yourorg/palindrome-policy-rust
-  io.kubewarden.policy.source: https://github.com/yourorg/palindrome-policy-rust
+  io.kubewarden.policy.title: palindrome-labels-rust
+  io.kubewarden.policy.description: A Kubewarden policy to reject Pod with palindrome labels
+  io.kubewarden.policy.author: Enrico Candino
+  io.kubewarden.policy.url: https://github.com/enrichman/palindrome-policy-rust
+  io.kubewarden.policy.source: https://github.com/enrichman/palindrome-policy-rust
   io.kubewarden.policy.license: Apache-2.0
   io.kubewarden.policy.usage: |
-    Long explaination.
-
-    **Note well:** this can be Markdown text
+    TODO

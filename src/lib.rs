@@ -13,6 +13,8 @@ use settings::Settings;
 
 use slog::{info, o, warn, Logger};
 
+use crate::settings::is_palindrome;
+
 lazy_static! {
     static ref LOG_DRAIN: Logger = Logger::root(
         logging::KubewardenDrain::new(),
@@ -32,31 +34,52 @@ fn validate(payload: &[u8]) -> CallResult {
 
     info!(LOG_DRAIN, "starting validation");
 
-    // TODO: you can unmarshal any Kubernetes API type you are interested in
-    match serde_json::from_value::<apicore::Pod>(validation_request.request.object) {
-        Ok(pod) => {
-            // TODO: your logic goes here
-            if pod.metadata.name == Some("invalid-pod-name".to_string()) {
-                let pod_name = pod.metadata.name.unwrap();
-                info!(
-                    LOG_DRAIN,
-                    "rejecting pod";
-                    "pod_name" => &pod_name
-                );
-                kubewarden::reject_request(
-                    Some(format!("pod name {} is not accepted", &pod_name)),
-                    None,
-                )
-            } else {
-                info!(LOG_DRAIN, "accepting resource");
-                kubewarden::accept_request()
-            }
+    let pod_result = serde_json::from_value::<apicore::Pod>(validation_request.request.object);
+    match pod_result {
+        Err(err) => {
+            warn!(LOG_DRAIN, "cannot unmarshal resource [{}]: this policy does not know how to evaluate this resource; accept it", err);
+            kubewarden::accept_request()
         }
-        Err(_) => {
-            // TODO: handle as you wish
-            // We were forwarded a request we cannot unmarshal or
-            // understand, just accept it
-            warn!(LOG_DRAIN, "cannot unmarshal resource: this policy does not know how to evaluate this resource; accept it");
+
+        Ok(mut pod) => {
+            if let Some(labels) = pod.metadata.labels.clone() {
+                let whitelist = validation_request.settings.whitelisted_labels;
+
+                let palindrome_labels = labels
+                    .keys()
+                    .cloned()
+                    .into_iter()
+                    .filter(|label| is_palindrome(label))
+                    .collect::<Vec<String>>();
+                let palindrome_count = palindrome_labels.len();
+
+                let invalid_labels = palindrome_labels
+                    .into_iter()
+                    .filter(|label| !whitelist.contains(label))
+                    .collect::<Vec<String>>();
+
+                if invalid_labels.len() as i32 > validation_request.settings.threshold {
+                    return kubewarden::reject_request(
+                        Some(format!(
+                            "Too many palindrome labels that are not-whitelisted: {:?}. Max allowed [{}]",
+                            invalid_labels, validation_request.settings.threshold
+                        )),
+                        None,
+                    );
+                }
+
+                let mut new_annotations = pod.metadata.annotations.clone().unwrap_or_default();
+                new_annotations.insert(
+                    String::from("kubewarden.policy.palindromes/count"),
+                    palindrome_count.to_string(),
+                );
+                pod.metadata.annotations = Some(new_annotations);
+
+                let mutated_object = serde_json::to_value(pod)?;
+                return kubewarden::mutate_request(mutated_object);
+            };
+
+            info!(LOG_DRAIN, "accepting resource");
             kubewarden::accept_request()
         }
     }
@@ -69,69 +92,74 @@ mod tests {
     use kubewarden_policy_sdk::test::Testcase;
 
     #[test]
-    fn accept_pod_with_no_palindromes() -> Result<(), ()> {
-        let request_file = "test_data/pod_no_pal.json";
+    fn accept_pod_with_no_palindromes() {
+        let request_file = "test_data/pod.json";
         let tc = Testcase {
             name: String::from("Valid labels"),
             fixture_file: String::from(request_file),
             expected_validation_result: true,
-            settings: Settings::new(),
+            settings: Settings::default(),
         };
 
-        let res = tc.eval(validate).unwrap();
-        assert!(
-            res.mutated_object.is_none(),
-            "Something mutated with test case: {}",
-            tc.name,
-        );
-
-        Ok(())
+        tc.eval(validate).unwrap();
     }
 
     #[test]
-    fn reject_pod_with_invalid_name() -> Result<(), ()> {
-        let request_file = "test_data/pod_pal.json";
+    fn reject_pod_with_palindromes() {
+        let request_file = "test_data/pod-palindrome.json";
         let tc = Testcase {
             name: String::from("Palindrome labels"),
             fixture_file: String::from(request_file),
             expected_validation_result: false,
-            settings: Settings {
-                threshold: 0,
-                whitelisted_labels: ["foo", "baz"]
-                    .iter()
-                    .cloned()
-                    .map(ToString::to_string)
-                    .collect(),
-            },
+            settings: Settings::default(),
         };
 
-        let res = tc.eval(validate).unwrap();
-        assert!(
-            res.mutated_object.is_none(),
-            "Something mutated with test case: {}",
-            tc.name,
-        );
-
-        Ok(())
+        tc.eval(validate).unwrap();
     }
 
     #[test]
-    fn accept_request_with_non_pod_resource() -> Result<(), ()> {
-        let request_file = "test_data/pod_no_pal.json";
+    fn reject_pod_with_only_one_whitelisted_palindrome() {
+        let request_file = "test_data/pod-palindrome.json";
         let tc = Testcase {
-            name: String::from("Ingress creation"),
+            name: String::from("Palindrome labels"),
             fixture_file: String::from(request_file),
-            expected_validation_result: true,
-            settings: Settings::new(),
+            expected_validation_result: false,
+            settings: build_settings(0, vec!["level"]),
         };
 
-        let res = tc.eval(validate).unwrap();
-        assert!(
-            res.mutated_object.is_none(),
-            "Something mutated with test case: {}",
-            tc.name,
-        );
+        tc.eval(validate).unwrap();
+    }
 
-        Ok(())
+    #[test]
+    fn accept_pod_with_whitelisted_palindromes() {
+        let request_file = "test_data/pod-palindrome.json";
+        let tc = Testcase {
+            name: String::from("Valid labels"),
+            fixture_file: String::from(request_file),
+            expected_validation_result: true,
+            settings: build_settings(0, vec!["level", "radar"]),
+        };
+
+        tc.eval(validate).unwrap();
+    }
+
+    #[test]
+    fn accept_pod_with_whitelisted_and_threshold_palindromes() {
+        let request_file = "test_data/pod-palindrome.json";
+        let tc = Testcase {
+            name: String::from("Valid labels"),
+            fixture_file: String::from(request_file),
+            expected_validation_result: true,
+            settings: build_settings(1, vec!["level"]),
+        };
+
+        tc.eval(validate).unwrap();
+    }
+
+    fn build_settings(threshold: i32, whitelisted_labels: Vec<&str>) -> Settings {
+        Settings {
+            threshold,
+            whitelisted_labels: whitelisted_labels.iter().map(ToString::to_string).collect(),
+        }
     }
 }

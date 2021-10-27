@@ -7,18 +7,18 @@ use slog::info;
 
 // Describe the settings your policy expects when
 // loaded by the policy server.
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub(crate) struct Settings {
     pub threshold: i32,
     pub whitelisted_labels: HashSet<String>,
 }
 
-impl Settings {
-    pub fn new() -> Self {
-        Settings {
-            threshold: 0,
-            whitelisted_labels: HashSet::new(),
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            threshold: Default::default(),
+            whitelisted_labels: Default::default(),
         }
     }
 }
@@ -102,12 +102,11 @@ mod tests {
     }
 
     #[test]
-    fn test_is_palindrome() -> Result<(), ()> {
+    fn test_is_palindrome() {
         assert!(is_palindrome("level"));
         assert!(!is_palindrome("foo"));
         assert!(is_palindrome("a"));
         assert!(is_palindrome("aa"));
         assert!(is_palindrome("aba"));
-        Ok(())
     }
 }
