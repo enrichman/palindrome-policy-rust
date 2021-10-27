@@ -1,9 +1,7 @@
-use std::collections::HashSet;
-
 use crate::LOG_DRAIN;
-
 use serde::{Deserialize, Serialize};
 use slog::info;
+use std::collections::HashSet;
 
 // Describe the settings your policy expects when
 // loaded by the policy server.
@@ -58,55 +56,5 @@ pub fn is_palindrome(word: &str) -> bool {
             return false;
         }
     }
-    return true;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use kubewarden_policy_sdk::settings::Validatable;
-
-    #[test]
-    fn validate_settings_ok() {
-        let settings = Settings {
-            threshold: 0,
-            whitelisted_labels: HashSet::new(),
-        };
-
-        assert!(settings.validate().is_ok());
-    }
-
-    #[test]
-    fn validate_settings_invalid_whitelisted_labels() {
-        let settings = Settings {
-            threshold: 0,
-            whitelisted_labels: ["foo", "baz"]
-                .iter()
-                .cloned()
-                .map(ToString::to_string)
-                .collect(),
-        };
-
-        assert!(settings.validate().is_err());
-    }
-
-    #[test]
-    fn validate_settings_invalid_threshold() {
-        let settings = Settings {
-            threshold: -5,
-            whitelisted_labels: HashSet::new(),
-        };
-
-        assert!(settings.validate().is_err());
-    }
-
-    #[test]
-    fn test_is_palindrome() {
-        assert!(is_palindrome("level"));
-        assert!(!is_palindrome("foo"));
-        assert!(is_palindrome("a"));
-        assert!(is_palindrome("aa"));
-        assert!(is_palindrome("aba"));
-    }
+    true
 }
